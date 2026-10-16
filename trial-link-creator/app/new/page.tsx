@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Upload, X } from "lucide-react";
 import { api, parseEmails, type NewSurvey, type SurveyDetail, type UploadedMedia } from "@/lib/api";
@@ -14,17 +14,11 @@ export default function Page() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [intro, setIntro] = useState("");
-  const [features, setFeatures] = useState<{ key: string; label: string }[]>([]);
-  const [rewards, setRewards] = useState<Record<string, string>>({});
+  const [credits, setCredits] = useState("");
   const [questions, setQuestions] = useState<DraftQuestion[]>(() => [newQuestion()]);
   const [emails, setEmails] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => {
-    api<{ key: string; label: string }[]>("/v1/admin/surveys/reward-features")
-      .then(setFeatures)
-      .catch((e: Error) => setError(e.message));
-  }, []);
   const patchQuestion = (key: number, patch: Partial<DraftQuestion>) =>
     setQuestions((qs) => qs.map((q) => (q.key === key ? { ...q, ...patch } : q)));
   const patchOption = (qKey: number, oKey: number, patch: Partial<DraftOption>) =>
@@ -45,6 +39,7 @@ export default function Page() {
     }
   }
   const list = parseEmails(emails);
+  const rewardCredits = Math.floor(Number(credits)) || 0;
   const uploading = questions.some((q) => q.options.some((o) => o.uploading));
   const problem = !title.trim()
     ? "Give the survey a title."
@@ -54,18 +49,16 @@ export default function Page() {
         ? "Every option needs a label, a picture or a video."
         : uploading
           ? "Wait for the uploads to finish."
-          : "";
+          : rewardCredits < 0 || rewardCredits > 1000
+            ? "Reward must be between 0 and 1000 credits."
+            : "";
   async function save() {
     setSaving(true);
     setError("");
     const body: NewSurvey = {
       title,
       intro,
-      rewards: Object.fromEntries(
-        Object.entries(rewards)
-          .map(([k, v]) => [k, Math.floor(Number(v))] as const)
-          .filter(([, n]) => n > 0),
-      ),
+      rewards: rewardCredits > 0 ? { credits: rewardCredits } : {},
       questions: questions.map((q) => ({
         prompt: q.prompt,
         options: q.options.map((o) => ({ label: o.label, ...(o.media ? { mediaId: o.media.id } : {}) })),
@@ -96,21 +89,21 @@ export default function Page() {
       <section className="panel">
         <h2>Reward for answering</h2>
         <p className="muted small">
-          Extra uses added to the customer’s account on top of their plan. They stay until used. Leave at 0 for none.
+          Bonus credits added to the customer’s account on top of their plan’s monthly credits. They don’t reset and stay
+          until spent. Leave at 0 for none.
         </p>
-        {features.map((f) => (
-          <label key={f.key} className="field row">
-            <span>{f.label}</span>
-            <input
-              type="number"
-              min={0}
-              max={1000}
-              value={rewards[f.key] ?? ""}
-              placeholder="0"
-              onChange={(e) => setRewards((r) => ({ ...r, [f.key]: e.target.value }))}
-            />
-          </label>
-        ))}
+        <label className="field row">
+          <span>Credits</span>
+          <input
+            type="number"
+            min={0}
+            max={1000}
+            step={1}
+            value={credits}
+            placeholder="0"
+            onChange={(e) => setCredits(e.target.value)}
+          />
+        </label>
       </section>
       {questions.map((q, qi) => (
         <section key={q.key} className="panel">
