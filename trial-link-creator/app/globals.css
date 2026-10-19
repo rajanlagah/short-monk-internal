@@ -205,6 +205,10 @@ textarea {
   background: var(--sunken);
   border-radius: var(--radius);
 }
+.option-media.dropping {
+  outline: 2px dashed var(--brand);
+  outline-offset: -2px;
+}
 .option-media img,
 .option-media video {
   width: 100%;
@@ -213,6 +217,7 @@ textarea {
 }
 .upload {
   display: flex;
+  text-align: center;
   flex-direction: column;
   align-items: center;
   justify-content: center;

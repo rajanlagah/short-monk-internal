@@ -7,6 +7,7 @@ type DraftOption = { key: number; label: string; media: UploadedMedia | null; up
 type DraftQuestion = { key: number; prompt: string; options: DraftOption[] };
 const MIN_OPTIONS = 2,
   MAX_OPTIONS = 6;
+const ACCEPT = "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime";
 let nextKey = 1;
 const newOption = (): DraftOption => ({ key: nextKey++, label: "", media: null, uploading: false, error: "" });
 const newQuestion = (): DraftQuestion => ({ key: nextKey++, prompt: "", options: [newOption(), newOption()] });
@@ -19,6 +20,7 @@ export default function Page() {
   const [emails, setEmails] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [dropTarget, setDropTarget] = useState<number | null>(null);
   const patchQuestion = (key: number, patch: Partial<DraftQuestion>) =>
     setQuestions((qs) => qs.map((q) => (q.key === key ? { ...q, ...patch } : q)));
   const patchOption = (qKey: number, oKey: number, patch: Partial<DraftOption>) =>
@@ -122,16 +124,36 @@ export default function Page() {
           <div className="option-grid">
             {q.options.map((o, oi) => (
               <div key={o.key} className="option-card">
-                <div className="option-media">
+                <div
+                  className={`option-media${dropTarget === o.key ? " dropping" : ""}`}
+                  onDragOver={(e) => {
+                    if (o.uploading || !e.dataTransfer.types.includes("Files")) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "copy";
+                    setDropTarget(o.key);
+                  }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropTarget(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDropTarget(null);
+                    const file = e.dataTransfer.files[0];
+                    if (!file) return;
+                    if (!ACCEPT.split(",").includes(file.type))
+                      return patchOption(q.key, o.key, { error: "Drop a JPEG, PNG, WebP, GIF, MP4, WebM or MOV file." });
+                    void upload(q.key, o.key, file);
+                  }}
+                >
                   {o.media?.kind === "image" && <img src={o.media.url} alt="" />}
                   {o.media?.kind === "video" && <video src={o.media.url} controls playsInline preload="metadata" />}
                   {!o.media && (
                     <label className="upload">
                       <Upload size={18} />
-                      {o.uploading ? "Uploading…" : "Image or video"}
+                      {o.uploading ? "Uploading…" : "Drop or choose an image or video"}
                       <input
                         type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+                        accept={ACCEPT}
                         disabled={o.uploading}
                         onChange={(e) => {
                           const file = e.target.files?.[0];
