@@ -1,8 +1,16 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Plus, Trash2, Upload, X } from "lucide-react";
-import { api, parseEmails, type NewSurvey, type SurveyDetail, type UploadedMedia } from "@/lib/api";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Save, Trash2, Upload, X } from "lucide-react";
+import {
+  api,
+  parseEmails,
+  type Draft,
+  type DraftBody,
+  type NewSurvey,
+  type SurveyDetail,
+  type UploadedMedia,
+} from "@/lib/api";
 type DraftOption = { key: number; label: string; media: UploadedMedia | null; uploading: boolean; error: string };
 type DraftQuestion = { key: number; prompt: string; options: DraftOption[] };
 const MIN_OPTIONS = 2,
@@ -11,8 +19,33 @@ const ACCEPT = "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,v
 let nextKey = 1;
 const newOption = (): DraftOption => ({ key: nextKey++, label: "", media: null, uploading: false, error: "" });
 const newQuestion = (): DraftQuestion => ({ key: nextKey++, prompt: "", options: [newOption(), newOption()] });
+// Compares what's on screen with what was last saved.
+const snapshot = (b: DraftBody) =>
+  JSON.stringify([b.title, b.intro, b.credits, b.emails, b.questions.map((q) => [q.prompt, q.options.map((o) => [o.label, o.mediaId ?? null])])]);
+const bodyOf = (d: Draft): DraftBody => ({
+  ...d,
+  questions: d.questions.map((q) => ({
+    prompt: q.prompt,
+    options: q.options.map((o) => ({ label: o.label, ...(o.media ? { mediaId: o.media.id } : {}) })),
+  })),
+});
+// useSearchParams needs a Suspense boundary to build.
 export default function Page() {
+  return (
+    <Suspense fallback={<main className="page form muted">Loading…</main>}>
+      <SurveyForm />
+    </Suspense>
+  );
+}
+function SurveyForm() {
   const router = useRouter();
+  // ?draft=<id> opens a saved draft; saving a new one puts its id there.
+  const draftParam = useSearchParams().get("draft");
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [loadingDraft, setLoadingDraft] = useState(Boolean(draftParam));
+  const [savedAs, setSavedAs] = useState("");
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [title, setTitle] = useState("");
   const [intro, setIntro] = useState("");
   const [credits, setCredits] = useState("");
@@ -21,6 +54,43 @@ export default function Page() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [dropTarget, setDropTarget] = useState<number | null>(null);
+  const draftBody = (): DraftBody => ({
+    title,
+    intro,
+    credits,
+    questions: questions.map((q) => ({
+      prompt: q.prompt,
+      options: q.options.map((o) => ({ label: o.label, ...(o.media ? { mediaId: o.media.id } : {}) })),
+    })),
+    emails,
+  });
+  const fill = (d: Draft) => {
+    setTitle(d.title);
+    setIntro(d.intro);
+    setCredits(d.credits);
+    setEmails(d.emails);
+    setQuestions(
+      d.questions.length
+        ? d.questions.map((q) => ({
+            key: nextKey++,
+            prompt: q.prompt,
+            options: q.options.map((o) => ({ ...newOption(), label: o.label, media: o.media })),
+          }))
+        : [newQuestion()],
+    );
+    setDraftId(d.id);
+    setSavedAt(new Date(d.updatedAt));
+    setSavedAs(snapshot(bodyOf(d)));
+  };
+  useEffect(() => {
+    if (!draftParam || draftParam === draftId) return;
+    setLoadingDraft(true);
+    api<Draft>(`/v1/admin/survey-drafts/${draftParam}`)
+      .then(fill)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoadingDraft(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftParam]);
   const patchQuestion = (key: number, patch: Partial<DraftQuestion>) =>
     setQuestions((qs) => qs.map((q) => (q.key === key ? { ...q, ...patch } : q)));
   const patchOption = (qKey: number, oKey: number, patch: Partial<DraftOption>) =>
@@ -54,6 +124,34 @@ export default function Page() {
           : rewardCredits < 0 || rewardCredits > 1000
             ? "Reward must be between 0 and 1000 credits."
             : "";
+  async function saveDraft() {
+    setSavingDraft(true);
+    setError("");
+    try {
+      const body = draftBody();
+      const d = draftId
+        ? await api<Draft>(`/v1/admin/survey-drafts/${draftId}`, { method: "PUT", body })
+        : await api<Draft>("/v1/admin/survey-drafts", { method: "POST", body });
+      setDraftId(d.id);
+      setSavedAt(new Date(d.updatedAt));
+      setSavedAs(snapshot(body));
+      // Next's router picks this up, so a reload opens the draft.
+      if (!draftId) window.history.replaceState(null, "", `?draft=${d.id}`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+  async function deleteDraft() {
+    if (!draftId || !window.confirm("Delete this draft? Its uploaded pictures and videos are removed too.")) return;
+    try {
+      await api(`/v1/admin/survey-drafts/${draftId}`, { method: "DELETE" });
+      router.push("/surveys");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   async function save() {
     setSaving(true);
     setError("");
@@ -66,6 +164,7 @@ export default function Page() {
         options: q.options.map((o) => ({ label: o.label, ...(o.media ? { mediaId: o.media.id } : {}) })),
       })),
       emails: list,
+      ...(draftId ? { draftId } : {}),
     };
     try {
       const survey = await api<SurveyDetail>("/v1/admin/surveys", { method: "POST", body });
@@ -75,9 +174,18 @@ export default function Page() {
       setSaving(false);
     }
   }
+  const unsaved = snapshot(draftBody()) !== savedAs;
+  if (loadingDraft) return <main className="page form muted">Loading draft…</main>;
   return (
     <main className="page form">
-      <h1>New survey</h1>
+      <div className="heading">
+        <h1>New survey</h1>
+        {draftId && (
+          <button className="ghost danger" onClick={deleteDraft}>
+            <Trash2 size={15} /> Delete draft
+          </button>
+        )}
+      </div>
       <section className="panel">
         <label className="field">
           <span>Title</span>
@@ -207,10 +315,16 @@ export default function Page() {
         </p>
       )}
       <div className="actions">
-        <button className="button" disabled={Boolean(problem) || saving} onClick={save}>
+        <button className="button" disabled={Boolean(problem) || saving || savingDraft} onClick={save}>
           {saving ? "Creating…" : "Create survey"}
         </button>
-        <span className="muted small">{problem || "A survey can’t be edited after it’s created."}</span>
+        <button className="ghost" disabled={!unsaved || uploading || savingDraft || saving} onClick={saveDraft}>
+          <Save size={15} /> {savingDraft ? "Saving…" : "Save draft"}
+        </button>
+        <span className="muted small">
+          {savedAt && (unsaved ? "Unsaved changes. " : `Draft saved ${savedAt.toLocaleTimeString()}. `)}
+          {problem || "A survey can’t be edited after it’s created."}
+        </span>
       </div>
     </main>
   );

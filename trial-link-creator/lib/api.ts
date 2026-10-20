@@ -44,6 +44,58 @@ export type NewSurvey = {
   rewards: Record<string, number>;
   questions: { prompt: string; options: { label: string; mediaId?: string }[] }[];
   emails: string[];
+  draftId?: string;
+};
+// A survey not created yet, as the form holds it (nothing checked).
+export type DraftBody = {
+  title: string;
+  intro: string;
+  credits: string;
+  questions: { prompt: string; options: { label: string; mediaId?: string }[] }[];
+  emails: string;
+};
+export type Draft = Omit<DraftBody, "questions"> & {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  questions: { prompt: string; options: { label: string; media: UploadedMedia | null }[] }[];
+};
+export type DraftRow = { id: string; title: string; updatedAt: string; questionCount: number };
+export type PlanCount = { slug: string; name: string; priceInr: number; users: number; newUsers: number; beta: number; admins: number };
+export type JobCount = { kind: string; total: number; completed: number; failed: number; cancelled: number };
+export type Analytics = {
+  period: { days: number; from: string; to: string };
+  plans: PlanCount[];
+  jobs: JobCount[];
+  credits: { spent: number; refunded: number; given: number; toppedUp: number };
+  money: {
+    revenue: { subscriptions: number; topups: number; total: number };
+    cost: { ai: number; storage: number; total: number };
+    profit: number;
+    rates: { usdPerCredit: number; usdPerGbMonth: number; inrPerUsd: number };
+    storedBytes: number;
+  };
+  betaFeatures: string[];
+};
+export type FailedJob = {
+  id: string;
+  kind: string;
+  error: string | null;
+  attempts: number;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  project: { id: string; title: string } | null;
+  user: { id: string; email: string; plan: string } | null;
+};
+export type Customer = {
+  id: string;
+  email: string;
+  name: string | null;
+  plan: string;
+  isAdmin: boolean;
+  betaEnabled: boolean;
+  createdAt: string;
 };
 export class ApiError extends Error {
   constructor(

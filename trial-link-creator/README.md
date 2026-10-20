@@ -1,6 +1,15 @@
-# Trial link creator
+# ShortMonk internal tools
 
-Internal tool for ShortMonk admins. Build a survey (questions, each with two
+Internal tools for ShortMonk admins. The home page lists them (`lib/tools.ts`; add a new tool there):
+
+- **Surveys** (`/surveys`): trial links, below.
+- **Analytics** (`/analytics`): users per plan, processes and the failed ones with their errors, an
+  estimated profit and loss for the last 7/30/90 days, and the beta switch per customer
+  (API routes in `servers/api/src/admin-analytics.js`).
+
+## Surveys
+
+Build a survey (questions, each with two
 or more image/video options), choose a reward, add customer emails, and send
 each customer their own link by hand. It then shows, per survey, how many
 links were opened and answered and how many of those emails have an account.
@@ -34,3 +43,5 @@ Sign in with an account that has `users.is_admin = true`.
   account with the link's email: at once if it exists, otherwise the first
   time that email signs in.
 - A survey can't be edited after it is created; you can add more emails to it, or delete it.
+- "Save draft" keeps a survey you're still writing (on the server, so it opens on any machine). Drafts
+  are listed on the Surveys page; creating the survey deletes its draft.

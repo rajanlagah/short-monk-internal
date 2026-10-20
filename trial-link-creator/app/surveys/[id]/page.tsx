@@ -55,7 +55,7 @@ export default function Page() {
     if (!window.confirm(`Delete "${survey!.title}"? Its links stop working and its answers and files are removed.`)) return;
     try {
       await api(`/v1/admin/surveys/${id}`, { method: "DELETE" });
-      router.push("/");
+      router.push("/surveys");
     } catch (e) {
       setError((e as Error).message);
     }

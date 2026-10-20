@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { api, ApiError, getToken, setToken } from "@/lib/api";
 import { apiBaseUrl, googleClientId } from "@/lib/config";
+import { TOOLS } from "@/lib/tools";
 declare global {
   interface Window {
     google?: {
@@ -34,6 +36,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<"checking" | "signed-out" | "ready">("checking");
   const [error, setError] = useState("");
   const slot = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
   const accept = (user: Me) => {
     if (!user.isAdmin) {
       setToken("");
@@ -92,7 +95,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   if (state === "signed-out")
     return (
       <main className="page narrow">
-        <h1>Trial links</h1>
+        <h1>ShortMonk internal</h1>
         <p className="muted">Internal tool. Sign in with a ShortMonk admin account.</p>
         <div ref={slot} className="google-slot" />
         {error && (
@@ -106,9 +109,16 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     <>
       <header className="topbar">
         <Link href="/" className="brand">
-          Trial links
+          ShortMonk internal
         </Link>
-        <span className="muted">{me?.email}</span>
+        <nav className="nav">
+          {TOOLS.map((t) => (
+            <Link key={t.href} href={t.href} aria-current={pathname.startsWith(t.href) ? "page" : undefined}>
+              {t.name}
+            </Link>
+          ))}
+        </nav>
+        <span className="muted email">{me?.email}</span>
         <button
           className="ghost"
           onClick={() => {
