@@ -6,6 +6,9 @@ Internal tools for ShortMonk admins. The home page lists them (`lib/tools.ts`; a
 - **Analytics** (`/analytics`): users per plan, processes and the failed ones with their errors, an
   estimated profit and loss for the last 7/30/90 days, and the beta switch per customer
   (API routes in `servers/api/src/admin-analytics.js`).
+- **Caption templates** (`/templates`): every template in the database, hidden ones too, with its card
+  image state; switch which ones the editor's gallery shows, one at a time or all filtered at once
+  (API routes in `servers/api/src/caption-templates.js`).
 
 ## Surveys
 

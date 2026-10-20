@@ -97,6 +97,19 @@ export type Customer = {
   betaEnabled: boolean;
   createdAt: string;
 };
+export type CaptionTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  sample: string;
+  scene: string;
+  position: number;
+  active: boolean;
+  previewUrl: string | null;
+  previewAnimUrl: string | null;
+  previewError: string | null;
+  updatedAt: string;
+};
 export class ApiError extends Error {
   constructor(
     message: string,
